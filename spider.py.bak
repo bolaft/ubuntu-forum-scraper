@@ -1,0 +1,219 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+:Name:
+spider.py
+
+:Authors:
+Soufian Salim (soufi@nsal.im)
+
+:Date:
+October 28th, 2014
+
+:Description:
+forum.ubuntu-fr.org forum spider
+"""
+
+from datetime import date, timedelta
+from scrapy import Spider, Selector, Item, Field, Request
+from time import sleep
+
+import io, json
+
+excluded_categories = [u"Activités autour du libre", u"Divers"]
+
+delay = 1
+
+start_date = date(2014, 9, 1)
+end_date = date(2014, 9, 30)
+
+
+class Forum(Item):
+	"""
+	Forum object (forum metadata + threads)
+	"""
+	identifier = Field()
+	name = Field()
+	url = Field()
+	category = Field()
+	description = Field()
+	threads = Field()
+
+
+class Thread(Item):
+	"""
+	Thread object (thread metadata + posts)
+	"""
+	identifier = Field()
+	name = Field()
+	url = Field()
+	sticky = Field()
+	closed = Field()
+	posts = Field()
+
+
+class Post(Item):
+	"""
+	Post object (post metadata and message)
+	"""
+	author = Field()
+	number = Field()
+	datetime = Field()
+	content = Field()
+	signature = Field()
+
+
+class ForumSpider(Spider):
+	"""
+	This spider crawls forum.ubuntu-fr.org looking to build forums maps containing threads, posts and related metadata
+	"""
+	name = "forum"
+
+	allowed_domains = ["forum.ubuntu-fr.org"]
+
+	start_urls = ["http://forum.ubuntu-fr.org"]
+
+	data = []
+
+	def parse(self, response):
+		"""
+		Parses the http://forum.ubuntu-fr.org page for forums and crawls through forum links
+		"""
+		i = 0
+
+		for bt in response.css(".blocktable"):
+			bt_selector = Selector(text=bt.extract())
+
+			category = bt_selector.xpath("//h2/span/text()").extract()[0]
+
+			if category in excluded_categories:
+				continue
+
+			for tr in bt_selector.xpath("//tbody/tr"):
+				tr_selector = Selector(text=tr.extract())
+
+				description = tr_selector.css(".forumdesc").xpath("text()").extract()
+				link = tr_selector.xpath("//a/@href").extract()[0]
+
+				forum = Forum(
+					identifier=extract_identifier(link),
+					name=tr_selector.xpath("//h3/a/text()").extract()[0],
+					url=make_url(link),
+					category=category,
+					description=description[0] if len(description) > 0 else None,
+					threads=[]
+				)
+
+				subforum_names = tr_selector.xpath("//div/a/text()").extract() + tr_selector.xpath("//div/a/strong/text()").extract()
+				subforum_links = tr_selector.xpath("//div/a/@href").extract()
+
+				subforums = [Forum(
+					identifier=extract_identifier(link),
+					name=name,
+					url=make_url(link),
+					category=category,
+					description=None,
+					threads=[]
+				) for name, link in zip(subforum_names, subforum_links)]
+
+				forums = [forum] + subforums
+
+				for forum in forums:
+					if i == 2:
+						break
+					i += 1
+
+					yield self.make_request(forum, forum, self.crawl_forum)
+
+				break
+
+		with io.open("data.json", "w", encoding="utf-8") as f:
+  			f.write(unicode(json.dumps(self.data, ensure_ascii=False)))
+
+
+	def crawl_forum(self, response):
+		"""
+		Crawls through forum links to gather thread information
+		"""
+		forum = response.meta["forum"]
+
+		table_selector = Selector(text=response.css(".blocktable").extract()[0])
+
+		# TODO: check beyond first page
+
+		for tr in table_selector.xpath("//tbody/tr"):
+			tr_selector = Selector(text=tr.extract())
+
+			link = tr_selector.xpath("//a/@href").extract()[0]
+			# date = compute_date(tr_selector.xpath("//a/text()").extract()[-1])
+
+			# if date < start_date:
+			# 	break
+
+			thread = Thread(
+				identifier=extract_identifier(link),
+				name=tr_selector.xpath("//a/text()").extract()[0],
+				url=make_url(link)
+			)
+
+			# if thread not in forum["threads"]:
+			forum["threads"].append(thread)
+
+			yield self.make_request(thread, forum, self.crawl_thread)
+
+
+	def crawl_thread(self, response):
+		"""
+		Crawls through thread links to gather post information
+		"""
+		forum = response.meta["forum"]
+
+		return forum
+
+
+	def make_request(self, item, forum, callback):
+		if item in self.requested:
+			return False
+
+		self.requested.append(item)
+
+		self.log("Requesting \"{0}\" (n°{1})".format(item["name"].encode("utf-8"), item["identifier"]))
+		sleep(delay)
+		request = Request(item["url"], callback=callback)
+		request.meta["forum"] = forum
+
+		return request
+
+
+def make_url(link):
+	"""
+	Makes a relative link absolute
+	"""
+	base_url = "http://forum.ubuntu-fr.org/"
+	return base_url + link.replace("./", "")
+
+
+def extract_identifier(link):
+	"""
+	Extracts item ids from links
+	"""
+	if "&" in link:
+		return int(link[link.index("id=") + 3:link.index("&")])
+	else:
+		return int(link[link.index("id=") + 3:])
+
+
+def compute_date(s):
+	"""
+	Extracts the date from the "dernier message" column cell in the thread table
+	"""
+	if s.startswith("Aujourd'hui"):
+		d = date.today()
+	elif s.startswith("Hier"):
+		d = date.today() - timedelta(days=1)
+	else:
+		ds = s[3:s.index(",")]
+		d = date(int(ds[6:]), int(ds[3:5]), int(ds[0:2]))
+
+	return d
