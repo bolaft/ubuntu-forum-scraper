@@ -33,6 +33,8 @@ class Post(Item):
 	number = Field()
 	datetime = Field()
 	content = Field()
+	signature = Field()
+	modification = Field()
 
 
 class PostSpider(Spider):
@@ -51,6 +53,7 @@ class PostSpider(Spider):
 		for thread in json_threads:
 			start_urls.append(thread["url"])
 
+	start_urls = ["http://forum.ubuntu-fr.org/viewtopic.php?id=108430"]
 
 	def parse(self, response):
 		"""
@@ -61,11 +64,27 @@ class PostSpider(Spider):
 		for bp in response.css(".blockpost"):
 			bp_selector = Selector(text=bp.extract())
 
+			message = "".join(bp_selector.xpath(
+				"//div[@class='postmsg']/node()[not(local-name() = 'div' and @class='postsignature') and not(local-name() = 'p' and @class='postedit')]"
+			).extract()).strip()
+
+			signature = bp_selector.css(".postsignature").xpath("p/node()").extract()
+
+			modification = bp_selector.css(".postedit").extract()
+
+			if len(modification) > 0:
+				s = modification[0]
+				modification = str(compute_date(s[s.find("(")+1:s.find(")")]))
+			else:
+				modification = False
+
 			post = Post(
 				author=bp_selector.xpath("//strong/text()").extract()[0],
 				number=int(bp_selector.xpath("//h2/span/span/text()").extract()[0][1:]),
 				datetime=str(compute_date(bp_selector.xpath("//h2/span/a/text()").extract()[0])),
-				content=bp_selector.css(".postmsg").extract()[0].replace("<div class=\"postmsg\">\n\t\t\t\t\t\t<p>", "")[:-6],
+				content=message,
+				signature="".join(signature).strip() if len(signature) > 0 else False,
+				modification=modification,
 				thread=extract_identifier(response.request.url)
 			)
 
