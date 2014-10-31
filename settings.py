@@ -10,15 +10,13 @@
 """
 
 
-from datetime import date
-
-
-delay = 1
+from datetime import datetime
 
 excluded_categories = [u"Activités autour du libre", u"Divers"]
 
-start_date = date(2014, 9, 1)
-end_date = date(2014, 9, 30)
+start_date = datetime(2014, 10, 20)
+end_date = datetime(2014, 10, 26)
 
 forum_json_file = "data/forums.json"
 thread_json_file = "data/threads.json"
+post_json_file = "data/posts.json"

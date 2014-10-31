@@ -16,8 +16,7 @@ forum.ubuntu-fr.org forum spider
 """
 
 from scrapy import Spider, Selector, Item, Field
-from settings import delay, excluded_categories
-from time import sleep
+from settings import excluded_categories
 from utility import make_url, extract_identifier
 
 
@@ -47,8 +46,6 @@ class ForumSpider(Spider):
 		"""
 		Parses the http://forum.ubuntu-fr.org page for forums
 		"""
-		sleep(delay)
-
 		for bt in response.css(".blocktable"):
 			bt_selector = Selector(text=bt.extract())
 
@@ -89,5 +86,3 @@ class ForumSpider(Spider):
 
 				for forum in forums:
 					yield forum
-
-				break

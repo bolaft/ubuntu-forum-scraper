@@ -3,7 +3,7 @@
 
 """
 :Name:
-spider.py
+post_spider.py
 
 :Authors:
 Soufian Salim (soufi@nsal.im)
@@ -12,14 +12,12 @@ Soufian Salim (soufi@nsal.im)
 October 28th, 2014
 
 :Description:
-forum.ubuntu-fr.org forum spider
+forum.ubuntu-fr.org post spider
 """
 
-from datetime import date
-from scrapy import Spider, Selector, Item, Field
-from settings import delay, start_date, end_date, thread_json_file
-from time import sleep
-from utility import make_url, extract_identifier, compute_date
+from scrapy import Spider, Selector, Item, Field, Request
+from settings import end_date, thread_json_file
+from utility import extract_identifier, compute_date
 
 import codecs, json
 
@@ -53,13 +51,32 @@ class PostSpider(Spider):
 		for thread in json_threads:
 			start_urls.append(thread["url"])
 
-	start_urls = ["http://forum.ubuntu-fr.org/viewtopic.php?id=108430"]
 
 	def parse(self, response):
 		"""
 		Parses the http://forum.ubuntu-fr.org thread pages
 		"""
-		sleep(delay)
+
+		link_selector = Selector(text=response.css(".pagelink").extract()[0])
+		links = link_selector.xpath("//a/text()").extract()
+
+		page_count = int(links[-2]) if len(links) > 0 else 1
+
+		bp_selector = Selector(text=response.css(".blockpost")[0].extract())
+		first_post_date = compute_date(bp_selector.xpath("//h2/span/a/text()").extract()[0])
+
+		if first_post_date > end_date:
+			return
+
+		for page_number in xrange(1, page_count + 1):
+			yield Request("{0}&p={1}".format(response.request.url, page_number), callback=self.parse_page)
+
+
+	def parse_page(self, response):
+
+		"""
+		Parses one page of the forum
+		"""
 
 		for bp in response.css(".blockpost"):
 			bp_selector = Selector(text=bp.extract())
