@@ -88,8 +88,6 @@ class ThreadSpider(Spider):
 				last_post_date=compute_date(date)
 			)
 
-			response.meta()
-
 			if thread["last_post_date"] < start_date:
 				break
 
