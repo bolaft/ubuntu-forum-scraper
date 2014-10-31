@@ -16,7 +16,7 @@ forum.ubuntu-fr.org post spider
 """
 
 from scrapy import Spider, Selector, Item, Field, Request
-from settings import end_date, thread_json_file
+from settings import start_date, end_date, thread_json_file
 from utility import extract_identifier, compute_date
 
 import codecs, json
@@ -49,6 +49,9 @@ class PostSpider(Spider):
 		json_threads = json.load(json_data)
 
 		for thread in json_threads:
+			if thread["last_post_date"] < start_date:
+				continue
+
 			start_urls.append(thread["url"])
 
 

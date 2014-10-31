@@ -88,7 +88,4 @@ class ThreadSpider(Spider):
 				last_post_date=compute_date(date)
 			)
 
-			if thread["last_post_date"] < start_date:
-				break
-
 			yield thread
