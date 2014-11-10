@@ -42,6 +42,7 @@ class ForumSpider(Spider):
 
 	start_urls = ["http://forum.ubuntu-fr.org"]
 
+
 	def parse(self, response):
 		"""
 		Parses the http://forum.ubuntu-fr.org page for forums

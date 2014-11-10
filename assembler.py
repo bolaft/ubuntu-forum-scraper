@@ -56,8 +56,7 @@ def assemble(options, output_file):
 							# json_threads.remove(thread)
 
 				for forum in json_forums:
-					# threads whose start date is posterior to the sample's end date may still be in the dataset at this point
-					# they are removed here (they do not contain any posts)
+					# empty threads (due to indesirable first and last post dates) are removed
 					to_be_removed = []
 
 					for thread in forum["threads"]:

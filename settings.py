@@ -9,7 +9,6 @@
     Soufian Salim (soufi@nsal.im)
 """
 
-
 from datetime import datetime
 
 excluded_categories = [u"Activités autour du libre", u"Divers"]
