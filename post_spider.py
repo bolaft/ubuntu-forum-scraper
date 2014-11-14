@@ -15,8 +15,9 @@ October 28th, 2014
 forum.ubuntu-fr.org post spider
 """
 
-from scrapy import Spider, Selector, Item, Field, Request
-from settings import start_date, end_date, thread_json_file
+from datetime import datetime
+from scrapy import Spider, Selector, Item, Field, Request, FormRequest
+from settings import start_date, end_date, thread_json_file, username, password
 from utility import extract_identifier, compute_date
 
 import codecs, json
@@ -26,7 +27,9 @@ class Post(Item):
 	"""
 	Post
 	"""
+
 	author = Field()
+	author_id = Field()
 	thread = Field()
 	number = Field()
 	datetime = Field()
@@ -43,23 +46,56 @@ class PostSpider(Spider):
 
 	allowed_domains = ["forum.ubuntu-fr.org"]
 
-	start_urls = []
-
-	with codecs.open(thread_json_file, "r", "utf-8") as json_data:
-		json_threads = json.load(json_data)
-
-		for thread in json_threads:
-			if thread["last_post_date"] < start_date:
-				continue
-
-			start_urls.append(thread["url"])
+	start_urls = ["http://forum.ubuntu-fr.org"]
 
 
 	def parse(self, response):
 		"""
+		Master function
+		"""
+		return self.login(response)
+
+
+	def login(self, response):
+		"""
+		Attempts to login
+		"""
+		return FormRequest.from_response(response,
+			formxpath="//form[@id=\"login_top\"]",
+			formdata={
+				# "form_sent": "1",
+				# "redirect_url": "/index.php",
+				"req_username": username,
+				"req_password": password,
+			},
+			callback=self.request_threads
+		)
+
+
+	def request_threads(self, response):
+		"""
+		Sends a request to each thread url
+		"""
+		# check that the login succeeded before going on
+		if "title=\"Déconnexion\"" not in response.body:
+			print("====LOGIN FAILED====")
+			return
+
+		with codecs.open(thread_json_file, "r", "utf-8") as json_data:
+			json_threads = json.load(json_data)
+
+			for thread in json_threads:
+				thread_last_post_date = datetime.strptime(thread["last_post_date"], "%Y-%m-%d %H:%M:%S")
+				if thread_last_post_date < start_date:
+					continue
+				
+				yield Request(thread["url"], callback=self.parse_thread)
+
+
+	def parse_thread(self, response):
+		"""
 		Parses the http://forum.ubuntu-fr.org thread pages
 		"""
-
 		link_selector = Selector(text=response.css(".pagelink").extract()[0])
 		links = link_selector.xpath("//a/text()").extract()
 
@@ -80,7 +116,6 @@ class PostSpider(Spider):
 		"""
 		Parses one page of the forum
 		"""
-
 		for bp in response.css(".blockpost"):
 			bp_selector = Selector(text=bp.extract())
 
@@ -98,8 +133,11 @@ class PostSpider(Spider):
 			else:
 				modification = False
 
+			author_link_list = bp_selector.xpath("//strong/a/@href").extract()
+
 			post = Post(
-				author=bp_selector.xpath("//strong/text()").extract()[0],
+				author=bp_selector.xpath("//strong/a/text()").extract()[0] if len(author_link_list) > 0 else bp_selector.xpath("//strong/text()").extract()[0],
+				author_id=extract_identifier(author_link_list[0]) if len(author_link_list) > 0 else None,
 				number=int(bp_selector.xpath("//h2/span/span/text()").extract()[0][1:]),
 				datetime=str(compute_date(bp_selector.xpath("//h2/span/a/text()").extract()[0])),
 				content=message,

@@ -16,7 +16,7 @@ forum.ubuntu-fr.org thread spider
 """
 
 from scrapy import Spider, Selector, Item, Field, Request
-from settings import start_date, forum_json_file
+from settings import forum_json_file
 from utility import make_url, extract_identifier, compute_date
 
 import codecs, json
