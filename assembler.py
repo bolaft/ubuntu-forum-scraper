@@ -16,6 +16,7 @@ Assembles data collected by the forum, thread and post spiders
 """
 
 from optparse import OptionParser
+from progressbar import ProgressBar
 from settings import forum_json_file, thread_json_file, post_json_file
 
 import codecs, json, io
@@ -38,22 +39,38 @@ def assemble(options, output_file):
 			with codecs.open(options.post_file, "r", "utf-8") as json_post_data:
 				json_posts = json.load(json_post_data)
 
-				for forum in json_forums:
+				thread_ids = []
+
+				for post in json_posts:
+					if post["thread"] not in thread_ids:
+						thread_ids.append(post["thread"])
+
+				forum_ids = []
+
+				for thread in json_threads:
+					if thread["forum"] not in forum_ids:
+						forum_ids.append(thread["forum"])
+
+				progress = ProgressBar()
+				
+				for forum in progress(json_forums):
+					if forum["identifier"] not in forum_ids:
+						continue
+
 					forum["threads"] = []
 
 					for thread in json_threads:
+						if thread["identifier"] not in thread_ids:
+							continue
+
 						thread["posts"] = []
 
 						for post in json_posts:
 							if post["thread"] == thread["identifier"]:
-								# del post["thread"]
 								thread["posts"].append(post)
-								# json_posts.remove(post)
 
 						if thread["forum"] == forum["identifier"]:
-							# del thread["forum"]
 							forum["threads"].append(thread)
-							# json_threads.remove(thread)
 
 				for forum in json_forums:
 					# empty threads (due to indesirable first and last post dates) are removed

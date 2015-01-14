@@ -10,5 +10,5 @@ The program works as follows:
 1. Deletes previous data files
 2. Scrapes the main forum page for forum informations (excluding some categories) and exports them as a json file
 3. For each forum, scrapes the list of threads and exports it as json file
-4. For each thread, scrapes all posts (if the thread either starts or ends within the defined time span) and exports them as a json file
+4. For each thread, scrapes all posts (if at least one post in the thread is within the defined time span) and exports them as a json file
 5. Combines all three json files into one, removing empty (undesirable) threads

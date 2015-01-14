@@ -78,7 +78,7 @@ class PostSpider(Spider):
 		"""
 		# check that the login succeeded before going on
 		if "title=\"Déconnexion\"" not in response.body:
-			print("====LOGIN FAILED====")
+			print("error: could not login")
 			return
 
 		with codecs.open(thread_json_file, "r", "utf-8") as json_data:
@@ -86,7 +86,7 @@ class PostSpider(Spider):
 
 			for thread in json_threads:
 				thread_last_post_date = datetime.strptime(thread["last_post_date"], "%Y-%m-%d %H:%M:%S")
-				if thread_last_post_date < start_date:
+				if thread_last_post_date < start_date or thread_last_post_date > end_date:
 					continue
 				
 				yield Request(thread["url"], callback=self.parse_thread)
@@ -104,7 +104,7 @@ class PostSpider(Spider):
 		bp_selector = Selector(text=response.css(".blockpost")[0].extract())
 		first_post_date = compute_date(bp_selector.xpath("//h2/span/a/text()").extract()[0])
 
-		if first_post_date > end_date:
+		if first_post_date > end_date or first_post_date < start_date:
 			return
 
 		for page_number in xrange(1, page_count + 1):

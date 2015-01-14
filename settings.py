@@ -13,12 +13,12 @@ from datetime import datetime
 
 excluded_categories = [u"Activités autour du libre", u"Divers"]
 
-start_date = datetime(2014, 01, 01)
-end_date = datetime(2014, 01, 31)
+start_date = datetime(2012, 01, 01)
+end_date = datetime(2012, 12, 31)
 
 forum_json_file = "data/forums.json"
 thread_json_file = "data/threads.json"
-post_json_file = "data/posts.json"
+post_json_file = "data/posts_2012.json"
 
 username = "pspider"
 password = "QdwaZyPO"
