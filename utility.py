@@ -38,8 +38,10 @@ def compute_date(s):
         d = datetime.today()
     elif s.startswith("Hier"):
         d = datetime.today() - timedelta(days=1)
-    else:
+    elif s.startswith("Le "):
         ds = s[3:s.index(",")]
         d = datetime(int(ds[6:]), int(ds[3:5]), int(ds[0:2]))
+    else:
+        return datetime(0, 0, 0)
 
     return d.replace(hour=int(s[-5:-3]), minute=int(s[-2:]), second=0, microsecond=0)

@@ -16,76 +16,75 @@ forum.ubuntu-fr.org thread spider
 """
 
 from scrapy import Spider, Selector, Item, Field, Request
-from settings import forum_json_file
+from settings import forum_json_file, max_forum_page
 from utility import make_url, extract_identifier, compute_date
 
-import codecs, json
+import codecs
+import json
 
 
 class Thread(Item):
-	"""
-	Thread
-	"""
-	identifier = Field()
-	name = Field()
-	url = Field()
-	sticky = Field()
-	closed = Field()
-	forum = Field()
-	last_post_date = Field()
+    """
+    Thread
+    """
+    identifier = Field()
+    name = Field()
+    url = Field()
+    sticky = Field()
+    closed = Field()
+    forum = Field()
+    last_post_date = Field()
 
 
 class ThreadSpider(Spider):
-	"""
-	This spider crawls forum.ubuntu-fr.org forums to scrape thread information
-	"""
-	name = "thread"
+    """
+    This spider crawls forum.ubuntu-fr.org forums to scrape thread information
+    """
+    name = "thread"
 
-	allowed_domains = ["forum.ubuntu-fr.org"]
+    allowed_domains = ["forum.ubuntu-fr.org"]
 
-	start_urls = []
+    start_urls = []
 
-	max_page = -1
+    with codecs.open(forum_json_file, "r", "utf-8") as json_data:
+        json_forums = json.load(json_data)
 
-	with codecs.open(forum_json_file, "r", "utf-8") as json_data:
-		json_forums = json.load(json_data)
+        for forum in json_forums:
+            start_urls.append(forum["url"])
 
-		for forum in json_forums:
-			start_urls.append(forum["url"])
+    def parse(self, response):
+        """
+        Parses the http://forum.ubuntu-fr.org forum pages
+        """
+        link_selector = Selector(text=response.css(".pagelink").extract()[0])
+        links = link_selector.xpath("//a/text()").extract()
 
+        page_count = int(links[-2]) if len(links) > 0 else 1
 
-	def parse(self, response):
-		"""
-		Parses the http://forum.ubuntu-fr.org forum pages
-		"""
-		link_selector = Selector(text=response.css(".pagelink").extract()[0])
-		links = link_selector.xpath("//a/text()").extract()
+        max_page = page_count if page_count < max_forum_page else max_forum_page
 
-		page_count = int(links[-2]) if len(links) > 0 else 1
+        for page_number in xrange(1, max_page + 1):
+            yield Request("{0}&p={1}".format(response.request.url, page_number), callback=self.parse_page)
 
-		for page_number in xrange(1, page_count + 1):
-			yield Request("{0}&p={1}".format(response.request.url, page_number), callback=self.parse_page)
+    def parse_page(self, response):
+        """
+        Parses one page of the forum
+        """
+        table_selector = Selector(text=response.css(".blocktable").extract()[0])
 
+        for tr in table_selector.xpath("//tbody/tr"):
+            tr_selector = Selector(text=tr.extract())
+            link = tr_selector.xpath("//a/@href").extract()[0]
+            date = tr_selector.xpath("//a/text()").extract()[-1]
 
-	def parse_page(self, response):
-		"""
-		Parses one page of the forum
-		"""
-		table_selector = Selector(text=response.css(".blocktable").extract()[0])
+            thread = Thread(
+                identifier=extract_identifier(link),
+                name=tr_selector.xpath("//a/text()").extract()[0],
+                url=make_url(link),
+                sticky=True if "sticky" in tr_selector.extract() else False,
+                closed=True if "closed" in tr_selector.extract() else False,
+                forum=extract_identifier(response.request.url),
+                last_post_date=compute_date(date)
+            )
 
-		for tr in table_selector.xpath("//tbody/tr"):
-			tr_selector = Selector(text=tr.extract())
-			link = tr_selector.xpath("//a/@href").extract()[0]
-			date = tr_selector.xpath("//a/text()").extract()[-1]
-
-			thread = Thread(
-				identifier=extract_identifier(link),
-				name=tr_selector.xpath("//a/text()").extract()[0],
-				url=make_url(link),
-				sticky=True if "sticky" in tr_selector.extract() else False,
-				closed=True if "closed" in tr_selector.extract() else False,
-				forum=extract_identifier(response.request.url),
-				last_post_date=compute_date(date)
-			)
-
-			yield thread
+            yield thread
